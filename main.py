@@ -1,51 +1,42 @@
-from langchain.llms import OpenAI
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain, SequentialChain
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    MessagesPlaceholder
+)
+from langchain.schema import SystemMessage
+from langchain.agents import OpenAIFunctionsAgent, AgentExecutor
 from dotenv import load_dotenv
-import argparse
+
+from tools.sql import run_query_tool, list_tables, describe_tables_tool
+
 
 load_dotenv()
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--task", default="return a list of numbers")
-parser.add_argument("--language", default="python")
-args = parser.parse_args()
+chat = ChatOpenAI()
 
-llm = OpenAI()
-
-code_prompt = PromptTemplate(
-    input_variables=["task", "language"],
-    template="Write a very short {language} function that will {task}."
-)
-test_prompt = PromptTemplate(
-    input_variables=["language", "code"],
-    template="Write a test for the following {language} code:\n{code}"
+tables = list_tables()
+prompt = ChatPromptTemplate(
+    messages=[
+        SystemMessage(content=f"You are an AI that has access to a SQLite database.\n{tables}"),
+        HumanMessagePromptTemplate.from_template("{input}"),
+        MessagesPlaceholder(variable_name="agent_scratchpad")
+    ]
 )
 
-code_chain = LLMChain(
-    llm=llm,
-    prompt=code_prompt,
-    output_key="code"
-)
-test_chain = LLMChain(
-    llm=llm,
-    prompt=test_prompt,
-    output_key="test"
+tools = [run_query_tool, describe_tables_tool]
+
+agent = OpenAIFunctionsAgent(
+    llm=chat,
+    prompt=prompt,
+    tools=tools
 )
 
-chain = SequentialChain(
-    chains=[code_chain, test_chain],
-    input_variables=["task", "language"],
-    output_variables=["test", "code"]
+agent_executor = AgentExecutor(
+    agent=agent,
+    verbose=True,
+    tools=tools
 )
 
-result = chain({
-    "language": args.language,
-    "task": args.task
-})
-
-print(">>>>>> GENERATED CODE:")
-print(result["code"])
-
-print(">>>>>> GENERATED TEST:")
-print(result["test"])
+agent_executor("How many users have provided a shipping address?")
+# agent_executor("how many users are there?")
