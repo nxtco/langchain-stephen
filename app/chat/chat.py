@@ -44,9 +44,6 @@ def build_chat(chat_args: ChatArgs):
         memory_map,
         chat_args
     )
-    print(
-        f"Runnig chain with llm: {llm_name}, retriever: {retriever_name}, memory: {memory_name}"
-    )
     set_conversation_components(
         chat_args.conversation_id,
         llm=llm_name,
@@ -61,5 +58,6 @@ def build_chat(chat_args: ChatArgs):
         llm=llm,
         condense_question_llm=condense_question_llm,
         memory=memory,
-        retriever=retriever
+        retriever=retriever,
+        metadata=chat_args.metadata
     )
